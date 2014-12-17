@@ -12,6 +12,10 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
+import java.util.Set;
+import java.util.Iterator;
+import java.io.StringReader;
+import android.util.JsonReader;
 
 import com.google.android.gcm.GCMBaseIntentService;
 
@@ -61,22 +65,54 @@ public class GCMIntentService extends GCMBaseIntentService {
 
 		// Extract the payload from the message
 		Bundle extras = intent.getExtras();
+    Log.i(TAG, "No of items in extras = " + extras.size());
+    Set<String> extraKeys = extras.keySet();
+    Iterator<String> eit = extraKeys.iterator();
+    while(eit.hasNext()) {
+      String key = eit.next();
+      Log.i(TAG, "Current key : " + key);
+      Log.i(TAG, key + " : " + extras.getString(key));
+    }
 		if (extras != null)
 		{
 			// if we are in the foreground, just surface the payload, else post it to the statusbar
-            if (PushPlugin.isInForeground()) {
-				extras.putBoolean("foreground", true);
-                PushPlugin.sendExtras(extras);
+      if (PushPlugin.isInForeground()) {
+        extras.putBoolean("foreground", true);
+        PushPlugin.sendExtras(extras);
 			}
 			else {
-				extras.putBoolean("foreground", false);
+        extras.putBoolean("foreground", false);
 
-                // Send a notification if there is a message
-                if (extras.getString("message") != null && extras.getString("message").length() != 0) {
-                    createNotification(context, extras);
+        // Send a notification if there is a message
+        if (extras.getString("message") != null && extras.getString("message").length() != 0) {
+          createNotification(context, extras);
+        } else {
+          try {
+            String dataString = extras.getString("data");
+            if (dataString != null && dataString.length() != 0) {
+              // This push is very likely from parse.com. "data" is a JSON string parse it and put the values in 'extras'
+              JsonReader reader = new JsonReader(new StringReader(dataString));
+              reader.beginObject();
+              while (reader.hasNext()) {
+                String key = reader.nextName();
+                if (key.equals("alert") || key.equals("message") || key.equals("title") || 
+                    key.equals("msgcnt") || key.equals("notId")) {
+                  extras.putString(key, reader.nextString());
                 }
+                else {
+                  reader.skipValue();
+                }
+              }
+              reader.endObject();
+              createNotification(context, extras);
             }
+          } catch (Exception e) {
+            Log.e(TAG, "Error parsing data field from Parse push : " + e.getMessage());
+            Log.e(TAG, "Not creating a system tray notification for the push message");
+          }
         }
+      }
+    }
 	}
 
 	public void createNotification(Context context, Bundle extras)
