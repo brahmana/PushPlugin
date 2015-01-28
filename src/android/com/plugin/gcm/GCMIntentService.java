@@ -148,7 +148,7 @@ public class GCMIntentService extends GCMBaseIntentService {
 		if (message != null) {
 			mBuilder.setContentText(message);
 			mBuilder.setStyle(new NotificationCompat.BigTextStyle()
-                			.bigText(message))
+                			.bigText(message));
 		} else {
 			mBuilder.setContentText("<missing message content>");
 		}
